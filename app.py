@@ -1,31 +1,21 @@
 """
 AI Symptom Checker Chatbot
-A professional healthcare AI application
+Professional Healthcare Application
 """
 
 import gradio as gr
 from symptom_checker_backend import SymptomCheckerBackend
-import uuid
 
 backend = SymptomCheckerBackend()
 
+# Emergency detection
 EMERGENCY_KEYWORDS = [
-    "chest pain", "difficulty breathing", "can't breathe", "cannot breathe",
-    "severe bleeding", "unconscious", "stroke", "heart attack",
-    "suicide", "overdose", "seizure", "paralysis",
-    "severe head injury", "loss of vision", "anaphylaxis"
+    "chest pain", "difficulty breathing", "can't breathe", "severe bleeding", 
+    "unconscious", "stroke", "heart attack", "seizure", "paralysis"
 ]
 
-SYMPTOM_ICONS = {
-    "fever": "🌡️", "cough": "😷", "headache": "🤕", "fatigue": "😴",
-    "nausea": "🤢", "chest pain": "💔", "sore throat": "🦠",
-    "shortness of breath": "😤", "dizziness": "🌀", "stomach pain": "📍",
-    "rash": "🔴", "runny nose": "🤧"
-}
-
-def check_emergency(symptoms_text):
-    """Check for emergency keywords"""
-    text = symptoms_text.lower()
+def check_emergency(text):
+    text = text.lower()
     for kw in EMERGENCY_KEYWORDS:
         if kw in text:
             return True, kw
@@ -36,94 +26,97 @@ def analyze(symptom, severity, duration, details):
     is_emerg, kw = check_emergency(symptom)
     if is_emerg:
         return f"""
-<div style="background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%); 
-            color: white; padding: 30px; border-radius: 16px; text-align: center;">
-    <div style="font-size: 60px; margin-bottom: 16px;">🚨</div>
-    <h2 style="margin: 0 0 12px;">EMERGENCY DETECTED</h2>
-    <p style="font-size: 18px; margin-bottom: 20px;">"{kw}" requires immediate attention</p>
-    <div style="background: rgba(255,255,255,0.2); padding: 16px; border-radius: 12px;">
-        <p style="font-size: 20px; font-weight: bold; margin: 0;">📞 Call 112 or Emergency Services NOW</p>
+<div style="background: #FEF2F2; border: 2px solid #DC2626; border-radius: 8px; padding: 24px; margin-bottom: 20px;">
+    <div style="display: flex; align-items: flex-start; gap: 16px;">
+        <div style="font-size: 32px; color: #DC2626;">⚠️</div>
+        <div>
+            <h3 style="color: #DC2626; margin: 0 0 8px; font-size: 18px;">Emergency Warning: {kw.title()}</h3>
+            <p style="color: #7F1D1D; margin: 0 0 12px;">This symptom may require immediate medical attention.</p>
+            <div style="background: #FEE2E2; padding: 12px; border-radius: 6px;">
+                <strong>Action Required:</strong> Call 112 or seek emergency care immediately.
+            </div>
+        </div>
     </div>
-    <p style="margin-top: 16px; opacity: 0.9;">Do not wait - seek immediate medical care</p>
 </div>
 """
     
-    advice = backend.symptomAdviceMap.get(symptom, "Consult a healthcare professional.")
+    advice = backend.symptomAdviceMap.get(symptom, "Please consult a healthcare professional.")
     follow = backend.followUpQuestions.get(symptom, "")
     
-    follow_resp = None
-    add_advice = None
-    if details:
-        follow_resp = backend.generate_response(symptom, details)
-        add_advice = backend.follow_up_advice(symptom, details)
-    
+    # Build severity badge
     sev = severity.lower()
-    banner = {"mild": ("🟢", "LOW CONCERN", "#059669"), 
-              "moderate": ("🟡", "MODERATE CONCERN", "#D97706"),
-              "severe": ("🔴", "HIGH CONCERN", "#DC2626")}.get(sev, ("🟡", "CONCERN", "#D97706"))
+    sev_data = {
+        "mild": ("Mild", "#059669", "#ECFDF5"),
+        "moderate": ("Moderate", "#D97706", "#FFFBEB"), 
+        "severe": ("Severe", "#DC2626", "#FEF2F2")
+    }.get(sev, ("Moderate", "#D97706", "#FFFBEB"))
     
-    icon = SYMPTOM_ICONS.get(symptom, "🏥")
+    # Get causes
     causes = get_causes(symptom)
     
-    return f"""
-<div style="background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.1);">
-    <div style="background: linear-gradient(135deg, {banner[2]} 0%, {banner[2]}CC 100%); 
-                color: white; padding: 24px; display: flex; align-items: center; gap: 16px;">
-        <span style="font-size: 48px;">{banner[0]}</span>
-        <div>
-            <div style="font-size: 14px; font-weight: 600; letter-spacing: 1px;">{banner[1]}</div>
-            <div style="font-size: 20px; font-weight: bold;">{icon} {symptom.title()}</div>
+    result = f"""
+<div style="background: white; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden;">
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #1E3A5F 0%, #234E70 100%); color: white; padding: 20px 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h2 style="margin: 0; font-size: 20px;">Health Assessment Report</h2>
+                <p style="margin: 4px 0 0; opacity: 0.8; font-size: 14px;">Generated: {symptom.title()}</p>
+            </div>
+            <div style="background: {sev_data[2]}; color: {sev_data[1]}; padding: 6px 14px; border-radius: 4px; font-size: 13px; font-weight: 600;">
+                {sev_data[0]} Severity
+            </div>
         </div>
     </div>
     
-    <div style="padding: 24px;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
-            <div style="background: #F3F4F6; padding: 16px; border-radius: 12px; text-align: center;">
-                <div style="font-size: 24px; font-weight: bold; color: #0066CC;">{severity}</div>
-                <div style="font-size: 12px; color: #6B7280;">Severity</div>
-            </div>
-            <div style="background: #F3F4F6; padding: 16px; border-radius: 12px; text-align: center;">
-                <div style="font-size: 24px; font-weight: bold; color: #0066CC;">{duration} days</div>
-                <div style="font-size: 12px; color: #6B7280;">Duration</div>
-            </div>
-        </div>
-        
+    <!-- Patient Info -->
+    <div style="padding: 20px 24px; border-bottom: 1px solid #E5E7EB;">
+        <table style="width: 100%; font-size: 14px;">
+            <tr>
+                <td style="padding: 8px 0; color: #6B7280;">Symptom</td>
+                <td style="padding: 8px 0; font-weight: 500;">{symptom.title()}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 0; color: #6B7280;">Duration</td>
+                <td style="padding: 8px 0;">{duration} days</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 0; color: #6B7280;">Severity</td>
+                <td style="padding: 8px 0;">{severity}</td>
+            </tr>
+        </table>
+    </div>
+    
+    <!-- Assessment Sections -->
+    <div style="padding: 20px 24px;">
+        <!-- Causes -->
         <div style="margin-bottom: 20px;">
-            <h3 style="color: #0066CC; margin: 0 0 12px; font-size: 16px;">🔍 Possible Causes</h3>
+            <h4 style="color: #1E3A5F; margin: 0 0 12px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Possible Causes</h4>
             {causes}
         </div>
         
-        <div style="background: #ECFDF5; border-left: 4px solid #059669; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
-            <h3 style="color: #059669; margin: 0 0 8px; font-size: 14px;">✅ Recommended Actions</h3>
-            <p style="margin: 0; color: #1F2937;">{advice}</p>
+        <!-- Recommendations -->
+        <div style="background: #F0FDF4; border-left: 4px solid #059669; padding: 16px; margin-bottom: 16px;">
+            <h4 style="color: #059669; margin: 0 0 8px; font-size: 13px;">Recommended Actions</h4>
+            <p style="margin: 0; font-size: 14px; line-height: 1.6;">{advice}</p>
         </div>
         
-        <div style="background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
-            <h3 style="color: #B45309; margin: 0 0 8px; font-size: 14px;">⚠️ See Doctor If</h3>
-            <ul style="margin: 0; padding-left: 20px; color: #1F2937;">
+        <!-- Warnings -->
+        <div style="background: #FFFBEB; border-left: 4px solid #D97706; padding: 16px;">
+            <h4 style="color: #B45309; margin: 0 0 8px; font-size: 13px;">Seek Medical Care If</h4>
+            <ul style="margin: 0; padding-left: 20px; font-size: 14px; color: #1F2937;">
                 <li>Symptoms persist beyond 3 days</li>
                 <li>Condition significantly worsens</li>
                 <li>New symptoms develop</li>
             </ul>
         </div>
-"""
-    
-    if follow_resp:
-        result += f"""
-        <div style="background: #EFF6FF; border-left: 4px solid #0066CC; padding: 16px; border-radius: 8px;">
-            <h3 style="color: #0066CC; margin: 0 0 8px; font-size: 14px;">💬 Follow-up Analysis</h3>
-            <p style="margin: 0; color: #1F2937;"><strong>Your response:</strong> {details}</p>
-            <p style="margin: 8px 0 0; color: #1F2937;">{follow_resp}</p>
-            {f'<p style="margin: 8px 0 0; color: #059669;"><strong>Additional:</strong> {add_advice}</p>' if add_advice else ''}
-        </div>
-"""
-    
-    result += """
     </div>
 </div>
 
-<div style="background: #FEF3C7; border: 1px solid #FCD34D; border-radius: 12px; padding: 16px; margin-top: 20px; text-align: center;">
-    <strong>⚠️ Disclaimer:</strong> This is for educational purposes only. Not medical advice. Consult a doctor for proper diagnosis.
+<!-- Disclaimer -->
+<div style="background: #F3F4F6; border-radius: 6px; padding: 16px; margin-top: 20px; font-size: 12px; color: #6B7280; text-align: center;">
+    <strong>Disclaimer:</strong> This assessment is for informational purposes only and does not constitute medical advice. 
+    Consult a qualified healthcare provider for proper diagnosis and treatment.
 </div>
 """
     return result
@@ -131,256 +124,272 @@ def analyze(symptom, severity, duration, details):
 def get_causes(symptom):
     """Get possible causes"""
     causes_map = {
-        "fever": [("65%", "Viral Infection", "Common cold/flu"), ("30%", "Bacterial Infection", "May need antibiotics")],
-        "cough": [("50%", "Common Cold", "Viral infection"), ("25%", "Allergies", "Seasonal triggers")],
-        "headache": [("40%", "Tension", "Stress/strain"), ("25%", "Dehydration", "Not enough fluids")],
-        "fatigue": [("45%", "Lack of Sleep", "Insufficient rest"), ("25%", "Stress", "Mental strain")],
-        "nausea": [("40%", "Gastritis", "Stomach inflammation"), ("30%", "Food Poisoning", "Contaminated food")],
-        "chest pain": [("35%", "Muscle Strain", "Physical exertion"), ("25%", "Anxiety", "Stress-related")],
-        "sore throat": [("50%", "Viral Pharyngitis", "Common cold"), ("25%", "Strep Throat", "Bacterial")],
-        "dizziness": [("40%", "Dehydration", "Low fluids"), ("25%", "Inner Ear", "Vertigo")],
-        "stomach pain": [("35%", "Indigestion", "Digestive issues"), ("25%", "Gas", "Bloating")],
-        "shortness of breath": [("30%", "Anxiety", "Hyperventilation"), ("25%", "Asthma", "Airway issues")],
-        "rash": [("40%", "Allergy", "Contact/food"), ("30%", "Eczema", "Skin condition")],
-        "runny nose": [("55%", "Common Cold", "Viral"), ("30%", "Allergies", "Hay fever")],
+        "fever": [("65%", "Viral Infection"), ("25%", "Bacterial Infection"), ("10%", "Other")],
+        "cough": [("50%", "Common Cold"), ("30%", "Allergies"), ("20%", "Other")],
+        "headache": [("40%", "Tension"), ("30%", "Dehydration"), ("20%", "Migraine")],
+        "fatigue": [("45%", "Lack of Rest"), ("30%", "Stress"), ("25%", "Medical Condition")],
+        "nausea": [("40%", "Gastritis"), ("35%", "Food Related"), ("25%", "Other")],
+        "chest pain": [("35%", "Muscle Strain"), ("30%", "GERD"), ("35%", "Other")],
+        "sore throat": [("50%", "Viral"), ("30%", "Bacterial"), ("20%", "Allergies")],
+        "dizziness": [("40%", "Dehydration"), ("35%", "Vertigo"), ("25%", "Other")],
+        "stomach pain": [("40%", "Indigestion"), ("35%", "Gas"), ("25%", "Infection")],
+        "shortness of breath": [("35%", "Anxiety"), ("30%", "Respiratory"), ("35%", "Other")],
+        "rash": [("45%", "Allergy"), ("30%", "Skin Condition"), ("25%", "Infection")],
+        "runny nose": [("55%", "Common Cold"), ("30%", "Allergies"), ("15%", "Other")],
     }
-    c = causes_map.get(symptom, [("50%", "Various Causes", "Multiple factors")])
-    html = ""
-    for pct, name, desc in c:
-        html += f'<div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #E5E7EB;"><span style="background: #0066CC; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold;">{pct}</span><div><strong>{name}</strong><br><span style="font-size: 12px; color: #6B7280;">{desc}</span></div></div>'
+    c = causes_map.get(symptom, [("50%", "Various Causes")])
+    html = '<table style="width: 100%; font-size: 14px;">'
+    for pct, name in c:
+        html += f'''
+        <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #E5E7EB;">
+                <span style="background: #1E3A5F; color: white; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; margin-right: 12px;">{pct}</span>
+                {name}
+            </td>
+        </tr>'''
+    html += '</table>'
     return html
 
 symptoms_list = list(backend.symptomKeywordsMap.keys())
 
+# Professional Healthcare CSS
 CSS = """
 * { box-sizing: border-box; }
 body { 
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    background: linear-gradient(180deg, #E0F2FE 0%, #FFFFFF 50%) !important;
-    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #F8FAFC !important;
 }
 .gradio-container {
-    max-width: 700px !important;
-    padding: 20px !important;
+    max-width: 680px !important;
+    padding: 24px !important;
 }
 footer, .built-with { display: none !important; }
-.main-header {
-    background: linear-gradient(135deg, #0066CC 0%, #0891B2 100%);
-    color: white;
-    padding: 32px;
-    border-radius: 20px;
-    text-align: center;
-    margin-bottom: 24px;
-    box-shadow: 0 10px 40px rgba(0,102,204,0.3);
-}
-.main-header h1 {
-    margin: 0 0 8px;
-    font-size: 32px;
-    font-weight: 700;
-}
-.main-header p {
-    margin: 0;
-    opacity: 0.9;
-    font-size: 16px;
-}
-.trust-tags {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    margin-top: 16px;
-    flex-wrap: wrap;
-}
-.trust-tag {
-    background: rgba(255,255,255,0.2);
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 12px;
-}
-.card {
+
+/* Header */
+.app-header {
     background: white;
-    border-radius: 16px;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
     padding: 24px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     margin-bottom: 20px;
 }
-.symptom-grid {
+.app-header h1 {
+    color: #1E3A5F;
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0;
+}
+.app-header p {
+    color: #64748B;
+    font-size: 14px;
+    margin: 8px 0 0;
+}
+.header-meta {
+    display: flex;
+    gap: 16px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #E2E8F0;
+    font-size: 12px;
+    color: #64748B;
+}
+.header-meta span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Form Card */
+.form-card {
+    background: white;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 20px;
+}
+.form-card h3 {
+    color: #1E293B;
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 16px;
+}
+
+/* Symptom Pills */
+.symptom-wrap {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
+    gap: 8px;
 }
-.symptom-pill {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+.symptom-option {
     padding: 12px 8px;
-    background: #F9FAFB;
-    border: 2px solid #E5E7EB;
-    border-radius: 12px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    text-align: center;
     cursor: pointer;
-    transition: all 0.2s;
-    font-size: 11px;
+    font-size: 12px;
+    color: #475569;
+    transition: all 0.15s;
 }
-.symptom-pill:hover {
-    border-color: #0066CC;
-    background: #EFF6FF;
-    transform: translateY(-2px);
+.symptom-option:hover {
+    border-color: #1E3A5F;
+    background: #F1F5F9;
 }
-.symptom-pill.active {
-    border-color: #0066CC;
-    background: #0066CC;
+.symptom-option.selected {
+    background: #1E3A5F;
+    border-color: #1E3A5F;
     color: white;
 }
-.symptom-pill span:first-child {
-    font-size: 24px;
-    margin-bottom: 4px;
-}
-.severity-btns {
+
+/* Severity */
+.severity-wrap {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
     margin: 16px 0;
 }
-.sev-btn {
+.severity-opt {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    padding: 16px;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px;
     background: white;
-    border: 2px solid #E5E7EB;
-    border-radius: 12px;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
     cursor: pointer;
-    transition: all 0.2s;
+    font-size: 14px;
+    font-weight: 500;
+    color: #475569;
+    transition: all 0.15s;
 }
-.sev-btn:hover { transform: translateY(-2px); }
-.sev-btn.selected { border-width: 3px; }
-.sev-btn.mild.selected { border-color: #059669; background: #ECFDF5; }
-.sev-btn.moderate.selected { border-color: #D97706; background: #FFFBEB; }
-.sev-btn.severe.selected { border-color: #DC2626; background: #FEF2F2; }
-.sev-btn span:first-child { font-size: 28px; }
-.sev-btn strong { font-size: 14px; margin: 4px 0; }
-.sev-btn small { font-size: 10px; color: #6B7280; }
-.analyze-btn {
-    background: linear-gradient(135deg, #0066CC 0%, #0891B2 100%) !important;
+.severity-opt:hover { background: #F8FAFC; }
+.severity-opt.selected {
+    border-color: #1E3A5F;
+    background: #1E3A5F;
+    color: white;
+}
+
+/* Inputs */
+label {
+    font-weight: 600 !important;
+    color: #334155 !important;
+    font-size: 13px !important;
+    margin-bottom: 6px !important;
+}
+input[type="text"], input[type="number"], textarea, select {
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 6px !important;
+    padding: 12px !important;
+    font-size: 14px !important;
+}
+input:focus, textarea:focus, select:focus {
+    border-color: #1E3A5F !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px #1E3A5F20 !important;
+}
+
+/* Button */
+.submit-btn {
+    background: #1E3A5F !important;
     border: none !important;
-    border-radius: 12px !important;
-    padding: 16px !important;
-    font-size: 18px !important;
+    border-radius: 6px !important;
+    padding: 14px 24px !important;
+    font-size: 15px !important;
     font-weight: 600 !important;
     color: white !important;
-    width: 100%;
-    margin-top: 16px;
-    box-shadow: 0 4px 15px rgba(0,102,204,0.4) !important;
 }
-.analyze-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0,102,204,0.5) !important;
+.submit-btn:hover {
+    background: #234E70 !important;
 }
-.input-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
+
+/* Results */
+.results-area {
+    margin-top: 20px;
 }
-.input-wrap label {
-    font-weight: 600 !important;
-    color: #1F2937 !important;
-    font-size: 14px !important;
-    margin-bottom: 8px !important;
+
+/* Disclaimer Footer */
+.disclaimer {
+    background: #F1F5F9;
+    border-radius: 6px;
+    padding: 16px;
+    margin-top: 20px;
+    font-size: 12px;
+    color: #64748B;
+    text-align: center;
 }
-.gr-input input, .gr-text textarea {
-    border: 2px solid #E5E7EB !important;
-    border-radius: 10px !important;
-    padding: 12px !important;
-}
-.gr-input input:focus, .gr-text textarea:focus {
-    border-color: #0066CC !important;
-    box-shadow: 0 0 0 3px rgba(0,102,204,0.1) !important;
-}
-@media (max-width: 600px) {
-    .symptom-grid { grid-template-columns: repeat(3, 1fr); }
-    .severity-btns { grid-template-columns: 1fr; }
-    .input-row { grid-template-columns: 1fr; }
-    .main-header h1 { font-size: 24px; }
+
+/* Mobile */
+@media (max-width: 500px) {
+    .symptom-wrap { grid-template-columns: repeat(3, 1fr); }
+    .severity-wrap { grid-template-columns: 1fr; }
 }
 """
 
 with gr.Blocks(css=CSS, title="AI Symptom Checker") as demo:
+    
+    # Header
     gr.HTML("""
-    <div class="main-header">
-        <h1>🏥 AI Symptom Checker</h1>
-        <p>Get instant health guidance powered by AI</p>
-        <div class="trust-tags">
-            <span class="trust-tag">🔒 Private</span>
-            <span class="trust-tag">⚡ Instant</span>
-            <span class="trust-tag">📋 Educational</span>
+    <div class="app-header">
+        <h1>AI Symptom Checker</h1>
+        <p>Professional health assessment tool</p>
+        <div class="header-meta">
+            <span>🔒 Private</span>
+            <span>📋 Educational</span>
+            <span>⚡ Instant</span>
         </div>
     </div>
     """)
     
-    gr.HTML('''
-    <div class="card">
-        <h3 style="margin: 0 0 16px; color: #1F2937;">Select Your Symptom:</h3>
-        <div class="symptom-grid">
-            <div class="symptom-pill" onclick="selectSymptom(this, \'fever\')"><span>🌡️</span><span>Fever</span></div>
-            <div class="symptom-pill" onclick="selectSymptom(this, \'cough\')"><span>😷</span><span>Cough</span></div>
-            <div class="symptom-pill" onclick="selectSymptom(this, \'headache\')"><span>🤕</span><span>Headache</span></div>
-            <div class="symptom-pill" onclick="selectSymptom(this, \'fatigue\')"><span>😴</span><span>Fatigue</span></div>
-            <div class="symptom-pill" onclick="selectSymptom(this, \'nausea\')"><span>🤢</span><span>Nausea</span></div>
-            <div class="symptom-pill" onclick="selectSymptom(this, \'chest pain\')"><span>💔</span><span>Chest Pain</span></div>
-            <div class="symptom-pill" onclick="selectSymptom(this, \'sore throat\')"><span>🦠</span><span>Sore Throat</span></div>
-            <div class="symptom-pill" onclick="selectSymptom(this, \'dizziness\')"><span>🌀</span><span>Dizziness</span></div>
-            <div class="symptom-pill" onclick="selectSymptom(this, \'shortness of breath\')"><span>😤</span><span>Breathing</span></div>
-            <div class="symptom-pill" onclick="selectSymptom(this, \'stomach pain\')"><span>📍</span><span>Stomach Pain</span></div>
-            <div class="symptom-pill" onclick="selectSymptom(this, \'rash\')"><span>🔴</span><span>Rash</span></div>
-            <div class="symptom-pill" onclick="selectSymptom(this, \'runny nose\')"><span>🤧</span><span>Runny Nose</span></div>
-        </div>
-    </div>
+    # Symptom Selection
+    gr.HTML('<div class="form-card"><h3>Select Symptom</h3><div class="symptom-wrap">')
+    for s in symptoms_list:
+        gr.HTML(f'<div class="symptom-option" onclick="selectS(\'{s}\', this)">{s.title()}</div>')
+    gr.HTML('</div></div>')
+    
+    gr.HTML("""
     <script>
-    function selectSymptom(el, val) {
-        document.querySelectorAll('.symptom-pill').forEach(b => b.classList.remove('active'));
-        el.classList.add('active');
+    function selectS(val, el) {
+        document.querySelectorAll('.symptom-option').forEach(o => o.classList.remove('selected'));
+        el.classList.add('selected');
         const sel = document.querySelector('select');
         if(sel) { sel.value = val; sel.dispatchEvent(new Event('change')); }
     }
     </script>
-    ''')
+    """)
     
     symptom_input = gr.Dropdown(choices=symptoms_list, value="fever", label="Selected Symptom", visible=True)
     
-    gr.HTML('''
-    <div class="card">
-        <h3 style="margin: 0 0 12px; color: #1F2937;">How Severe Is It?</h3>
-        <div class="severity-btns">
-            <div class="sev-btn mild" onclick="setSeverity(\'Mild\', this)"><span>🙂</span><strong>Mild</strong><small>Manageable</small></div>
-            <div class="sev-btn moderate selected" onclick="setSeverity(\'Moderate\', this)"><span>😐</span><strong>Moderate</strong><small>Daily affected</small></div>
-            <div class="sev-btn severe" onclick="setSeverity(\'Severe\', this)"><span>😣</span><strong>Severe</strong><small>Hard to ignore</small></div>
-        </div>
-    </div>
+    gr.HTML('<div class="form-card"><h3>Severity Level</h3><div class="severity-wrap"><div class="severity-opt" onclick="setSev(\'Mild\', this)">Mild</div><div class="severity-opt selected" onclick="setSev(\'Moderate\', this)">Moderate</div><div class="severity-opt" onclick="setSev(\'Severe\', this)">Severe</div></div></div>')
+    
+    gr.HTML("""
     <script>
-    function setSeverity(val, el) {
-        document.querySelectorAll('.sev-btn').forEach(b => b.classList.remove('selected'));
+    function setSev(val, el) {
+        document.querySelectorAll('.severity-opt').forEach(o => o.classList.remove('selected'));
         el.classList.add('selected');
     }
     </script>
-    ''')
+    """)
     
-    severity_input = gr.Radio(choices=["Mild", "Moderate", "Severe"], value="Moderate", label="Severity", visible=False)
+    severity_input = gr.Radio(choices=["Mild", "Moderate", "Severe"], value="Moderate", visible=False)
     
-    gr.HTML('<div class="card">')
+    gr.HTML('<div class="form-card">')
     duration_input = gr.Slider(1, 30, value=3, step=1, label="Duration (days)")
-    additional_info = gr.Textbox(label="Additional Details (optional)", placeholder="Any extra symptoms or information...", lines=2)
+    additional = gr.Textbox(label="Additional Information", placeholder="Describe any additional symptoms or details...")
     gr.HTML('</div>')
     
-    analyze_btn = gr.Button("🔍 Analyze Symptoms", elem_classes="analyze-btn")
+    analyze_btn = gr.Button("Generate Assessment", elem_classes="submit-btn")
     
-    output_area = gr.HTML()
+    output = gr.HTML(elem_classes="results-area")
     
     gr.HTML("""
-    <div style="background: #FEF3C7; border: 1px solid #FCD34D; border-radius: 12px; padding: 16px; margin-top: 16px; text-align: center; font-size: 13px;">
-        <strong>⚠️ Medical Disclaimer:</strong> This AI provides general health info only. Not a substitute for professional medical advice.
+    <div class="disclaimer">
+        <strong>Medical Disclaimer:</strong> This tool provides general health information only. 
+        It is not a substitute for professional medical advice, diagnosis, or treatment.
     </div>
     """)
     
-    analyze_btn.click(fn=analyze, inputs=[symptom_input, severity_input, duration_input, additional_info], outputs=output_area)
+    analyze_btn.click(fn=analyze, inputs=[symptom_input, severity_input, duration_input, additional], outputs=output)
 
 if __name__ == "__main__":
     demo.launch()
