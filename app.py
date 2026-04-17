@@ -1,31 +1,14 @@
 """
 AI Symptom Checker Chatbot
-=====================
-A professional healthcare AI application that helps users understand their symptoms
-and provides health guidance with follow-up questions.
-
-Features:
-- Emergency keyword detection
-- Visual symptom selector with icons
-- Severity assessment (Mild/Moderate/Severe)
-- Possible causes with likelihood percentages
-- Recommended actions
-- Warning signs to watch for
-- Follow-up question analysis
-- Professional healthcare UI
-
-Author: AI Symptom Checker Team
-License: Educational Use Only
+A professional healthcare AI application
 """
 
 import gradio as gr
 from symptom_checker_backend import SymptomCheckerBackend
 import uuid
 
-# Initialize the backend with symptom mappings and advice
 backend = SymptomCheckerBackend()
 
-# Emergency keywords that require immediate attention
 EMERGENCY_KEYWORDS = [
     "chest pain", "difficulty breathing", "can't breathe", "cannot breathe",
     "severe bleeding", "unconscious", "stroke", "heart attack",
@@ -33,7 +16,6 @@ EMERGENCY_KEYWORDS = [
     "severe head injury", "loss of vision", "anaphylaxis"
 ]
 
-# Emoji icons for each symptom for visual representation
 SYMPTOM_ICONS = {
     "fever": "🌡️", "cough": "😷", "headache": "🤕", "fatigue": "😴",
     "nausea": "🤢", "chest pain": "💔", "sore throat": "🦠",
@@ -41,853 +23,364 @@ SYMPTOM_ICONS = {
     "rash": "🔴", "runny nose": "🤧"
 }
 
-
-def check_emergency(symptom):
-    """
-    Check if any emergency keywords are present in the symptom description.
-    
-    Args:
-        symptom: The symptom text to check
-        
-    Returns:
-        Tuple of (is_emergency: bool, keyword: str or None)
-    """
-    symptom_lower = symptom.lower()
-    for keyword in EMERGENCY_KEYWORDS:
-        if keyword in symptom_lower:
-            return True, keyword
+def check_emergency(symptoms_text):
+    """Check for emergency keywords"""
+    text = symptoms_text.lower()
+    for kw in EMERGENCY_KEYWORDS:
+        if kw in text:
+            return True, kw
     return False, None
 
-
-def get_emergency_response(keyword):
-    """
-    Generate an emergency response when critical symptoms are detected.
-    
-    Args:
-        keyword: The emergency keyword detected
-        
-    Returns:
-        HTML formatted emergency message
-    """
-    return f"""
-<div class="emergency-banner">
-    <div class="emergency-icon">🚨</div>
-    <div class="emergency-content">
-        <h2>EMERGENCY DETECTED</h2>
-        <p>Your symptoms include <strong>"{keyword}"</strong> which may require immediate attention.</p>
-        <div class="emergency-actions">
-            <div class="action-item">📞</div>
-            <div class="action-text">Call 112 or your local emergency number NOW</div>
-        </div>
-        <div class="emergency-warning">
-            This AI cannot provide emergency medical care. Please seek immediate professional help.
-        </div>
+def analyze(symptom, severity, duration, details):
+    """Main analysis function"""
+    is_emerg, kw = check_emergency(symptom)
+    if is_emerg:
+        return f"""
+<div style="background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%); 
+            color: white; padding: 30px; border-radius: 16px; text-align: center;">
+    <div style="font-size: 60px; margin-bottom: 16px;">🚨</div>
+    <h2 style="margin: 0 0 12px;">EMERGENCY DETECTED</h2>
+    <p style="font-size: 18px; margin-bottom: 20px;">"{kw}" requires immediate attention</p>
+    <div style="background: rgba(255,255,255,0.2); padding: 16px; border-radius: 12px;">
+        <p style="font-size: 20px; font-weight: bold; margin: 0;">📞 Call 112 or Emergency Services NOW</p>
     </div>
+    <p style="margin-top: 16px; opacity: 0.9;">Do not wait - seek immediate medical care</p>
 </div>
 """
-
-
-def analyze_symptoms(symptom, severity, duration, details):
-    """
-    Main analysis function that processes user input and generates health assessment.
     
-    Args:
-        symptom: Selected symptom from the dropdown
-        severity: Selected severity level (Mild/Moderate/Severe)
-        duration: Number of days symptoms have persisted
-        details: Additional information provided by user
-        
-    Returns:
-        HTML formatted response with assessment results
-    """
-    # Step 1: Check for emergency keywords first
-    is_emergency, keyword = check_emergency(symptom)
-    if is_emergency:
-        return get_emergency_response(keyword)
+    advice = backend.symptomAdviceMap.get(symptom, "Consult a healthcare professional.")
+    follow = backend.followUpQuestions.get(symptom, "")
     
-    # Step 2: Get base advice and follow-up question from backend
-    advice = backend.symptomAdviceMap.get(symptom, "Please consult a healthcare professional.")
-    follow_up = backend.followUpQuestions.get(symptom, "")
-    
-    # Step 3: Process any follow-up information provided
-    follow_up_resp = None
-    additional = None
+    follow_resp = None
+    add_advice = None
     if details:
-        follow_up_resp = backend.generate_response(symptom, details)
-        additional = backend.follow_up_advice(symptom, details)
+        follow_resp = backend.generate_response(symptom, details)
+        add_advice = backend.follow_up_advice(symptom, details)
     
-    # Step 4: Determine severity level for banner color
-    severity_lower = severity.lower()
-    if severity_lower == "mild":
-        banner_class = "low"
-        banner_text = "LOW CONCERN"
-    elif severity_lower == "severe":
-        banner_class = "high"
-        banner_text = "HIGH CONCERN"
-    else:
-        banner_class = "medium"
-        banner_text = "MODERATE CONCERN"
+    sev = severity.lower()
+    banner = {"mild": ("🟢", "LOW CONCERN", "#059669"), 
+              "moderate": ("🟡", "MODERATE CONCERN", "#D97706"),
+              "severe": ("🔴", "HIGH CONCERN", "#DC2626")}.get(sev, ("🟡", "CONCERN", "#D97706"))
     
-    # Step 5: Get icon and possible causes
     icon = SYMPTOM_ICONS.get(symptom, "🏥")
-    causes = get_possible_causes(symptom)
+    causes = get_causes(symptom)
     
-    # Step 6: Build the HTML response
-    result = f"""
-<div class="results-container">
-    <div class="severity-banner {banner_class}">
-        <div class="severity-indicator">
-            <span class="severity-dot"></span>
-            <span class="severity-text">{banner_text}</span>
+    return f"""
+<div style="background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.1);">
+    <div style="background: linear-gradient(135deg, {banner[2]} 0%, {banner[2]}CC 100%); 
+                color: white; padding: 24px; display: flex; align-items: center; gap: 16px;">
+        <span style="font-size: 48px;">{banner[0]}</span>
+        <div>
+            <div style="font-size: 14px; font-weight: 600; letter-spacing: 1px;">{banner[1]}</div>
+            <div style="font-size: 20px; font-weight: bold;">{icon} {symptom.title()}</div>
         </div>
-        <p>Based on your {icon} <strong>{symptom}</strong> assessment</p>
     </div>
     
-    <div class="cards-grid">
-        <div class="result-card causes">
-            <div class="card-header">
-                <span class="card-icon">🔍</span>
-                <h3>Possible Causes</h3>
+    <div style="padding: 24px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+            <div style="background: #F3F4F6; padding: 16px; border-radius: 12px; text-align: center;">
+                <div style="font-size: 24px; font-weight: bold; color: #0066CC;">{severity}</div>
+                <div style="font-size: 12px; color: #6B7280;">Severity</div>
             </div>
-            <div class="card-body">
-                {causes}
+            <div style="background: #F3F4F6; padding: 16px; border-radius: 12px; text-align: center;">
+                <div style="font-size: 24px; font-weight: bold; color: #0066CC;">{duration} days</div>
+                <div style="font-size: 12px; color: #6B7280;">Duration</div>
             </div>
         </div>
         
-        <div class="result-card actions">
-            <div class="card-header">
-                <span class="card-icon">✅</span>
-                <h3>Recommended Actions</h3>
-            </div>
-            <div class="card-body">
-                <ul class="action-list">
-                    <li>{advice.split('.')[0]}.</li>
-                    <li>Monitor your symptoms for changes.</li>
-                    <li>Rest and stay well hydrated.</li>
-                </ul>
-            </div>
+        <div style="margin-bottom: 20px;">
+            <h3 style="color: #0066CC; margin: 0 0 12px; font-size: 16px;">🔍 Possible Causes</h3>
+            {causes}
         </div>
         
-        <div class="result-card warnings">
-            <div class="card-header warning">
-                <span class="card-icon">⚠️</span>
-                <h3>See a Doctor If</h3>
-            </div>
-            <div class="card-body">
-                <ul class="warning-list">
-                    <li>Symptoms persist beyond 3 days</li>
-                    <li>Condition significantly worsens</li>
-                    <li>New symptoms develop</li>
-                </ul>
-            </div>
+        <div style="background: #ECFDF5; border-left: 4px solid #059669; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+            <h3 style="color: #059669; margin: 0 0 8px; font-size: 14px;">✅ Recommended Actions</h3>
+            <p style="margin: 0; color: #1F2937;">{advice}</p>
         </div>
-    </div>
+        
+        <div style="background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+            <h3 style="color: #B45309; margin: 0 0 8px; font-size: 14px;">⚠️ See Doctor If</h3>
+            <ul style="margin: 0; padding-left: 20px; color: #1F2937;">
+                <li>Symptoms persist beyond 3 days</li>
+                <li>Condition significantly worsens</li>
+                <li>New symptoms develop</li>
+            </ul>
+        </div>
 """
     
-    # Step 7: Add follow-up section if user provided additional info
-    if follow_up_resp:
+    if follow_resp:
         result += f"""
-    <div class="follow-up-section">
-        <div class="card-header">
-            <span class="card-icon">💬</span>
-            <h3>Follow-up Analysis</h3>
+        <div style="background: #EFF6FF; border-left: 4px solid #0066CC; padding: 16px; border-radius: 8px;">
+            <h3 style="color: #0066CC; margin: 0 0 8px; font-size: 14px;">💬 Follow-up Analysis</h3>
+            <p style="margin: 0; color: #1F2937;"><strong>Your response:</strong> {details}</p>
+            <p style="margin: 8px 0 0; color: #1F2937;">{follow_resp}</p>
+            {f'<p style="margin: 8px 0 0; color: #059669;"><strong>Additional:</strong> {add_advice}</p>' if add_advice else ''}
         </div>
-        <div class="follow-up-content">
-            <p><strong>Your response:</strong> {details}</p>
-            <p><strong>Analysis:</strong> {follow_up_resp}</p>
-            {f'<p><strong>Additional guidance:</strong> {additional}</p>' if additional else ''}
-        </div>
-    </div>
 """
     
-    # Step 8: Add next steps buttons
     result += """
-    <div class="next-steps">
-        <h4>What would you like to do next?</h4>
-        <div class="action-buttons">
-            <button class="action-btn" onclick="window.open('https://www.practo.com', '_blank')">📅 Find a Doctor</button>
-            <button class="action-btn" onclick="location.reload()">💬 New Assessment</button>
-        </div>
     </div>
+</div>
+
+<div style="background: #FEF3C7; border: 1px solid #FCD34D; border-radius: 12px; padding: 16px; margin-top: 20px; text-align: center;">
+    <strong>⚠️ Disclaimer:</strong> This is for educational purposes only. Not medical advice. Consult a doctor for proper diagnosis.
 </div>
 """
     return result
 
-
-def get_possible_causes(symptom):
-    """
-    Get possible causes for a given symptom with likelihood percentages.
-    
-    Args:
-        symptom: The symptom to look up causes for
-        
-    Returns:
-        HTML formatted list of possible causes
-    """
-    # Mapping of symptoms to possible causes with percentages and descriptions
+def get_causes(symptom):
+    """Get possible causes"""
     causes_map = {
-        "fever": [("65%", "Viral Infection", "Common cold or flu"), ("30%", "Bacterial Infection", "May need antibiotics"), ("15%", "Other Causes", "Heat exhaustion, immune response")],
-        "cough": [("50%", "Common Cold", "Viral respiratory infection"), ("25%", "Allergies", "Seasonal or environmental"), ("15%", "GERD", "Acid reflux irritation"), ("10%", "Asthma", "Airway inflammation")],
-        "headache": [("40%", "Tension Headache", "Stress or muscle strain"), ("25%", "Dehydration", "Not enough fluids"), ("20%", "Migraine", "Neurological condition"), ("15%", "Sinusitis", "Sinus inflammation")],
-        "fatigue": [("45%", "Lack of Sleep", "Insufficient rest"), ("25%", "Stress/Anxiety", "Mental health impact"), ("20%", "Anemia", "Low iron levels"), ("10%", "Thyroid Issues", "Metabolic disorder")],
-        "nausea": [("40%", "Gastritis", "Stomach lining inflammation"), ("30%", "Food Poisoning", "Contaminated food/beverages"), ("20%", "Motion Sickness", "Travel-related"), ("10%", "Pregnancy", "Morning sickness")],
-        "chest pain": [("35%", "Muscle Strain", "Chest wall pain"), ("25%", "Anxiety/Panic", "Stress-related"), ("20%", "GERD", "Acid reflux"), ("20%", "Cardiac Issue", "Heart-related - seek care")],
-        "sore throat": [("50%", "Viral Pharyngitis", "Common cold/flu"), ("25%", "Strep Throat", "Bacterial infection"), ("15%", "Allergies", "Post-nasal drip"), ("10%", "Tonsillitis", "Tonsil inflammation")],
-        "shortness of breath": [("30%", "Anxiety", "Hyperventilation"), ("25%", "Asthma", "Airway constriction"), ("20%", "COPD", "Chronic lung disease"), ("25%", "Other Causes", "Various conditions")],
-        "dizziness": [("40%", "Dehydration", "Low fluid intake"), ("25%", "Inner Ear Issue", "Vertigo/BPPV"), ("20%", "Low Blood Sugar", "Hypoglycemia"), ("15%", "Medication Effect", "Side effect")],
-        "stomach pain": [("35%", "Indigestion", "Digestive discomfort"), ("25%", "Gas/Bloating", "Gastrointestinal gas"), ("20%", "Food Intolerance", "Lactose/gluten sensitivity"), ("20%", "Gastroenteritis", "Stomach flu")],
-        "rash": [("40%", "Allergic Reaction", "Contact or food allergy"), ("30%", "Eczema", "Chronic skin condition"), ("20%", "Infection", "Bacterial or viral"), ("10%", "Heat Rash", "Blocked sweat glands")],
-        "runny nose": [("55%", "Common Cold", "Viral infection"), ("30%", "Allergies", "Hay fever/allergic rhinitis"), ("15%", "Sinusitis", "Sinus infection")],
+        "fever": [("65%", "Viral Infection", "Common cold/flu"), ("30%", "Bacterial Infection", "May need antibiotics")],
+        "cough": [("50%", "Common Cold", "Viral infection"), ("25%", "Allergies", "Seasonal triggers")],
+        "headache": [("40%", "Tension", "Stress/strain"), ("25%", "Dehydration", "Not enough fluids")],
+        "fatigue": [("45%", "Lack of Sleep", "Insufficient rest"), ("25%", "Stress", "Mental strain")],
+        "nausea": [("40%", "Gastritis", "Stomach inflammation"), ("30%", "Food Poisoning", "Contaminated food")],
+        "chest pain": [("35%", "Muscle Strain", "Physical exertion"), ("25%", "Anxiety", "Stress-related")],
+        "sore throat": [("50%", "Viral Pharyngitis", "Common cold"), ("25%", "Strep Throat", "Bacterial")],
+        "dizziness": [("40%", "Dehydration", "Low fluids"), ("25%", "Inner Ear", "Vertigo")],
+        "stomach pain": [("35%", "Indigestion", "Digestive issues"), ("25%", "Gas", "Bloating")],
+        "shortness of breath": [("30%", "Anxiety", "Hyperventilation"), ("25%", "Asthma", "Airway issues")],
+        "rash": [("40%", "Allergy", "Contact/food"), ("30%", "Eczema", "Skin condition")],
+        "runny nose": [("55%", "Common Cold", "Viral"), ("30%", "Allergies", "Hay fever")],
     }
-    
-    causes = causes_map.get(symptom, [("50%", "Various Causes", "Multiple possibilities"), ("30%", "Infection", "Possible bacterial/viral"), ("20%", "Other Factors", "Various triggers")])
-    
+    c = causes_map.get(symptom, [("50%", "Various Causes", "Multiple factors")])
     html = ""
-    for percent, name, desc in causes:
-        html += f'''
-        <div class="cause-item">
-            <span class="cause-percent">{percent}</span>
-            <div class="cause-info">
-                <strong>{name}</strong>
-                <p>{desc}</p>
-            </div>
-        </div>
-        '''
+    for pct, name, desc in c:
+        html += f'<div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #E5E7EB;"><span style="background: #0066CC; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold;">{pct}</span><div><strong>{name}</strong><br><span style="font-size: 12px; color: #6B7280;">{desc}</span></div></div>'
     return html
 
-
-# Get list of available symptoms from backend
 symptoms_list = list(backend.symptomKeywordsMap.keys())
 
-
-# ============================================
-# PROFESSIONAL HEALTHCARE CSS STYLING
-# ============================================
-
-CUSTOM_CSS = """
-/* ============================================
-   AI SYMPTOM CHECKER - PROFESSIONAL STYLING
-   ============================================ */
-
-:root {
-    /* Healthcare Color Palette - Clinical Trust */
-    --primary: #0066CC;
-    --primary-light: #3388DD;
-    --primary-dark: #004C99;
-    --secondary: #00A3B4;
-    --success: #00A67E;
-    --success-light: #00D4A0;
-    --success-bg: rgba(0, 166, 126, 0.1);
-    --warning: #F5A623;
-    --warning-light: #FFB84D;
-    --warning-bg: rgba(245, 166, 35, 0.1);
-    --error: #D64242;
-    --error-light: #FF6B6B;
-    --error-bg: rgba(214, 66, 66, 0.1);
-    --bg-main: #F4F7FA;
-    --bg-surface: #FFFFFF;
-    --text-primary: #1A1F36;
-    --text-secondary: #5E6688;
-    --text-muted: #9AA3B8;
-    --border: #E3E8EF;
-    --border-light: #EEF1F5;
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
+CSS = """
+* { box-sizing: border-box; }
+body { 
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(180deg, #E0F2FE 0%, #FFFFFF 50%) !important;
+    min-height: 100vh;
 }
-
-/* Reset & Base Styles */
 .gradio-container {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-    background: var(--bg-main) !important;
-    max-width: 880px !important;
-    margin: 0 auto !important;
+    max-width: 700px !important;
     padding: 20px !important;
 }
-
-/* Hide Gradio branding */
-.gradio-container footer,
-.gradio-container .built-with,
-.gradio-container .api-link { display: none !important; }
-
-/* ============================================
-   HEADER STYLING
-   ============================================ */
-
-.app-header {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+footer, .built-with { display: none !important; }
+.main-header {
+    background: linear-gradient(135deg, #0066CC 0%, #0891B2 100%);
     color: white;
-    padding: 28px 32px !important;
-    border-radius: var(--radius-lg) !important;
-    margin-bottom: 24px !important;
-    box-shadow: var(--shadow-lg);
+    padding: 32px;
+    border-radius: 20px;
+    text-align: center;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 40px rgba(0,102,204,0.3);
 }
-
-.header-top {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 16px;
-}
-
-.logo-icon { font-size: 48px; }
-
-.header-text h1 {
-    font-size: 26px;
+.main-header h1 {
+    margin: 0 0 8px;
+    font-size: 32px;
     font-weight: 700;
+}
+.main-header p {
     margin: 0;
-    letter-spacing: -0.5px;
-}
-
-.header-text p {
     opacity: 0.9;
-    font-size: 14px;
-    margin: 4px 0 0;
+    font-size: 16px;
 }
-
-.trust-bar {
+.trust-tags {
     display: flex;
-    gap: 12px;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 16px;
     flex-wrap: wrap;
 }
-
-.trust-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(255,255,255,0.15);
+.trust-tag {
+    background: rgba(255,255,255,0.2);
     padding: 6px 14px;
     border-radius: 20px;
     font-size: 12px;
-    font-weight: 500;
-    backdrop-filter: blur(10px);
 }
-
-/* ============================================
-   INPUT SECTION
-   ============================================ */
-
-.input-section {
-    background: var(--bg-surface);
-    border-radius: var(--radius-lg);
+.card {
+    background: white;
+    border-radius: 16px;
     padding: 24px;
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     margin-bottom: 20px;
 }
-
-.section-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 12px;
-}
-
-/* Visual Symptom Grid */
 .symptom-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 10px;
-    margin: 16px 0;
 }
-
-.symptom-btn {
+.symptom-pill {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
-    padding: 14px 8px;
-    background: var(--bg-main);
-    border: 2px solid var(--border);
-    border-radius: var(--radius-md);
+    padding: 12px 8px;
+    background: #F9FAFB;
+    border: 2px solid #E5E7EB;
+    border-radius: 12px;
     cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text-secondary);
+    transition: all 0.2s;
+    font-size: 11px;
 }
-
-.symptom-btn:hover {
-    border-color: var(--primary);
-    background: rgba(0, 102, 204, 0.05);
-    color: var(--primary);
+.symptom-pill:hover {
+    border-color: #0066CC;
+    background: #EFF6FF;
     transform: translateY(-2px);
 }
-
-.symptom-btn.selected {
-    border-color: var(--primary);
-    background: var(--primary);
+.symptom-pill.active {
+    border-color: #0066CC;
+    background: #0066CC;
     color: white;
 }
-
-.symptom-icon { font-size: 24px; }
-
-/* ============================================
-   SEVERITY SELECTOR
-   ============================================ */
-
-.severity-selector { margin: 20px 0; }
-
-.severity-options {
+.symptom-pill span:first-child {
+    font-size: 24px;
+    margin-bottom: 4px;
+}
+.severity-btns {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
+    margin: 16px 0;
 }
-
-.severity-btn {
+.sev-btn {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    padding: 16px 12px;
-    background: var(--bg-surface);
-    border: 2px solid var(--border);
-    border-radius: var(--radius-md);
+    padding: 16px;
+    background: white;
+    border: 2px solid #E5E7EB;
+    border-radius: 12px;
     cursor: pointer;
     transition: all 0.2s;
-    text-align: center;
 }
-
-.severity-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-sm);
-}
-
-.severity-btn.mild { border-color: var(--success); }
-.severity-btn.mild.selected { background: var(--success-bg); }
-.severity-btn.moderate { border-color: var(--warning); }
-.severity-btn.moderate.selected { background: var(--warning-bg); }
-.severity-btn.severe { border-color: var(--error); }
-.severity-btn.severe.selected { background: var(--error-bg); }
-
-.severity-icon { font-size: 32px; }
-.severity-label { font-weight: 600; color: var(--text-primary); font-size: 14px; }
-.severity-desc { font-size: 11px; color: var(--text-muted); line-height: 1.3; }
-
-/* Input Field Styling */
-.gr-text-input input,
-.gr-text-input textarea {
-    border: 2px solid var(--border) !important;
-    border-radius: var(--radius-md) !important;
-    padding: 14px 16px !important;
-    font-size: 15px !important;
-    transition: all 0.2s !important;
-    background: var(--bg-surface) !important;
-}
-
-.gr-text-input input:focus,
-.gr-text-input textarea:focus {
-    border-color: var(--primary) !important;
-    box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.1) !important;
-}
-
-.gr-text-input label {
+.sev-btn:hover { transform: translateY(-2px); }
+.sev-btn.selected { border-width: 3px; }
+.sev-btn.mild.selected { border-color: #059669; background: #ECFDF5; }
+.sev-btn.moderate.selected { border-color: #D97706; background: #FFFBEB; }
+.sev-btn.severe.selected { border-color: #DC2626; background: #FEF2F2; }
+.sev-btn span:first-child { font-size: 28px; }
+.sev-btn strong { font-size: 14px; margin: 4px 0; }
+.sev-btn small { font-size: 10px; color: #6B7280; }
+.analyze-btn {
+    background: linear-gradient(135deg, #0066CC 0%, #0891B2 100%) !important;
+    border: none !important;
+    border-radius: 12px !important;
+    padding: 16px !important;
+    font-size: 18px !important;
     font-weight: 600 !important;
-    color: var(--text-primary) !important;
+    color: white !important;
+    width: 100%;
+    margin-top: 16px;
+    box-shadow: 0 4px 15px rgba(0,102,204,0.4) !important;
+}
+.analyze-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,102,204,0.5) !important;
+}
+.input-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+.input-wrap label {
+    font-weight: 600 !important;
+    color: #1F2937 !important;
     font-size: 14px !important;
     margin-bottom: 8px !important;
 }
-
-/* ============================================
-   ANALYZE BUTTON
-   ============================================ */
-
-.analyze-btn {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%) !important;
-    border: none !important;
-    border-radius: var(--radius-md) !important;
-    padding: 16px 32px !important;
-    font-size: 16px !important;
-    font-weight: 600 !important;
-    color: white !important;
-    cursor: pointer !important;
-    transition: all 0.3s ease !important;
-    width: 100% !important;
-    margin-top: 20px !important;
-    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3) !important;
+.gr-input input, .gr-text textarea {
+    border: 2px solid #E5E7EB !important;
+    border-radius: 10px !important;
+    padding: 12px !important;
 }
-
-.analyze-btn:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 20px rgba(0, 102, 204, 0.4) !important;
+.gr-input input:focus, .gr-text textarea:focus {
+    border-color: #0066CC !important;
+    box-shadow: 0 0 0 3px rgba(0,102,204,0.1) !important;
 }
-
-/* ============================================
-   RESULTS SECTION
-   ============================================ */
-
-.results-container {
-    background: var(--bg-surface);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    box-shadow: var(--shadow-lg);
-    animation: slideUp 0.4s ease;
-}
-
-@keyframes slideUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.severity-banner { padding: 20px 24px; color: white; }
-.severity-banner.low { background: linear-gradient(135deg, var(--success) 0%, var(--success-light) 100%); }
-.severity-banner.medium { background: linear-gradient(135deg, var(--warning) 0%, var(--warning-light) 100%); }
-.severity-banner.high { background: linear-gradient(135deg, var(--error) 0%, var(--error-light) 100%); }
-
-.severity-indicator { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-
-.severity-dot {
-    width: 10px; height: 10px;
-    background: white; border-radius: 50%;
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.7; transform: scale(1.2); }
-}
-
-.severity-text { font-weight: 700; font-size: 14px; letter-spacing: 1px; }
-
-.cards-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
-    padding: 20px;
-}
-
-.result-card {
-    background: var(--bg-main);
-    border-radius: var(--radius-md);
-    padding: 16px;
-    border: 1px solid var(--border-light);
-}
-
-.result-card.causes { grid-column: span 2; }
-
-.card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.card-icon { font-size: 20px; }
-.card-header h3 { font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0; }
-.card-header.warning h3 { color: var(--error); }
-
-.cause-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border-light);
-}
-
-.cause-item:last-child { border-bottom: none; }
-.cause-percent { font-weight: 700; color: var(--primary); font-size: 14px; }
-.cause-info strong { color: var(--text-primary); display: block; }
-.cause-info p { margin: 2px 0 0; font-size: 12px; }
-
-.action-list, .warning-list { list-style: none; padding: 0; margin: 0; }
-.action-list li, .warning-list li { padding: 8px 0; padding-left: 20px; position: relative; }
-.action-list li::before { content: "✓"; position: absolute; left: 0; color: var(--success); font-weight: bold; }
-.warning-list li::before { content: "!"; position: absolute; left: 0; color: var(--error); font-weight: bold; }
-
-/* ============================================
-   EMERGENCY BANNER
-   ============================================ */
-
-.emergency-banner {
-    background: linear-gradient(135deg, var(--error) 0%, #B71C1C 100%);
-    color: white; padding: 24px;
-    display: flex; gap: 16px;
-    align-items: flex-start;
-}
-
-.emergency-icon { font-size: 48px; }
-.emergency-content h2 { margin: 0 0 8px; font-size: 18px; }
-.emergency-actions { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
-.action-item { font-size: 24px; }
-.emergency-warning { background: rgba(255,255,255,0.2); padding: 12px; border-radius: 8px; font-size: 12px; }
-
-/* Follow-up Section */
-.follow-up-section {
-    background: rgba(0, 102, 204, 0.05);
-    padding: 16px 20px;
-    border-top: 1px solid var(--border-light);
-}
-
-.follow-up-content p { margin: 8px 0; font-size: 13px; }
-
-/* Next Steps */
-.next-steps {
-    padding: 20px;
-    border-top: 1px solid var(--border-light);
-    text-align: center;
-}
-
-.next-steps h4 { font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
-
-.action-buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-.action-btn {
-    padding: 10px 20px; border-radius: var(--radius-sm);
-    border: 1px solid var(--border); background: var(--bg-surface);
-    color: var(--text-secondary); font-size: 13px; font-weight: 500;
-    cursor: pointer; transition: all 0.2s;
-}
-.action-btn:hover { border-color: var(--primary); color: var(--primary); }
-
-/* ============================================
-   DISCLAIMER & PRIVACY
-   ============================================ */
-
-.disclaimer-section {
-    background: var(--warning-bg);
-    border: 1px solid rgba(245, 166, 35, 0.3);
-    border-radius: var(--radius-md);
-    padding: 16px;
-    margin: 20px 0;
-    font-size: 12px;
-    color: var(--text-secondary);
-    line-height: 1.6;
-}
-
-.privacy-section {
-    background: rgba(0, 102, 204, 0.05);
-    border-radius: var(--radius-md);
-    padding: 12px 16px;
-    font-size: 12px;
-    color: var(--text-secondary);
-    display: flex; align-items: center; gap: 8px;
-}
-
-/* Footer */
-.app-footer {
-    text-align: center; padding: 20px;
-    color: var(--text-muted); font-size: 11px;
-    border-top: 1px solid var(--border-light);
-    margin-top: 24px;
-}
-
-/* Hide Examples */
-.gr-examples { display: none !important; }
-
-/* ============================================
-   MOBILE RESPONSIVE
-   ============================================ */
-
-@media (max-width: 640px) {
-    .gradio-container { padding: 12px !important; }
-    .app-header { padding: 20px !important; border-radius: var(--radius-md) !important; }
-    .header-text h1 { font-size: 20px; }
-    .symptom-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .symptom-btn { padding: 10px 6px; }
-    .symptom-icon { font-size: 20px; }
-    .severity-options { grid-template-columns: 1fr; }
-    .cards-grid { grid-template-columns: 1fr; }
-    .result-card.causes { grid-column: span 1; }
-    .action-buttons { flex-direction: column; }
-    .action-btn { width: 100%; }
+@media (max-width: 600px) {
+    .symptom-grid { grid-template-columns: repeat(3, 1fr); }
+    .severity-btns { grid-template-columns: 1fr; }
+    .input-row { grid-template-columns: 1fr; }
+    .main-header h1 { font-size: 24px; }
 }
 """
 
-
-# ============================================
-# GRADIO INTERFACE BUILDER
-# ============================================
-
-with gr.Blocks(title="AI Symptom Checker") as demo:
-    
-    # Generate unique session ID for tracking
-    session_id = gr.State(value=str(uuid.uuid4())[:8])
-    
-    # Header with logo and trust badges
+with gr.Blocks(css=CSS, title="AI Symptom Checker") as demo:
     gr.HTML("""
-    <div class="app-header">
-        <div class="header-top">
-            <span class="logo-icon">🏥</span>
-            <div class="header-text">
-                <h1>AI Symptom Checker</h1>
-                <p>Get instant health guidance powered by AI</p>
-            </div>
-        </div>
-        <div class="trust-bar">
-            <span class="trust-item">🔒 Private</span>
-            <span class="trust-item">⚡ Instant</span>
-            <span class="trust-item">📋 Educational</span>
+    <div class="main-header">
+        <h1>🏥 AI Symptom Checker</h1>
+        <p>Get instant health guidance powered by AI</p>
+        <div class="trust-tags">
+            <span class="trust-tag">🔒 Private</span>
+            <span class="trust-tag">⚡ Instant</span>
+            <span class="trust-tag">📋 Educational</span>
         </div>
     </div>
     """)
     
-    # Input section with symptom grid and severity selector
-    gr.HTML("""
-    <div class="input-section">
-        <div class="section-title">Select Your Symptom:</div>
+    gr.HTML('''
+    <div class="card">
+        <h3 style="margin: 0 0 16px; color: #1F2937;">Select Your Symptom:</h3>
         <div class="symptom-grid">
-            <div class="symptom-btn" onclick="selectSymptom('fever')">
-                <span class="symptom-icon">🌡️</span>
-                <span>Fever</span>
-            </div>
-            <div class="symptom-btn" onclick="selectSymptom('cough')">
-                <span class="symptom-icon">😷</span>
-                <span>Cough</span>
-            </div>
-            <div class="symptom-btn" onclick="selectSymptom('headache')">
-                <span class="symptom-icon">🤕</span>
-                <span>Headache</span>
-            </div>
-            <div class="symptom-btn" onclick="selectSymptom('fatigue')">
-                <span class="symptom-icon">😴</span>
-                <span>Fatigue</span>
-            </div>
-            <div class="symptom-btn" onclick="selectSymptom('nausea')">
-                <span class="symptom-icon">🤢</span>
-                <span>Nausea</span>
-            </div>
-            <div class="symptom-btn" onclick="selectSymptom('chest pain')">
-                <span class="symptom-icon">💔</span>
-                <span>Chest Pain</span>
-            </div>
-            <div class="symptom-btn" onclick="selectSymptom('sore throat')">
-                <span class="symptom-icon">🦠</span>
-                <span>Sore Throat</span>
-            </div>
-            <div class="symptom-btn" onclick="selectSymptom('dizziness')">
-                <span class="symptom-icon">🌀</span>
-                <span>Dizziness</span>
-            </div>
-            <div class="symptom-btn" onclick="selectSymptom('shortness of breath')">
-                <span class="symptom-icon">😤</span>
-                <span>Breathing</span>
-            </div>
-            <div class="symptom-btn" onclick="selectSymptom('stomach pain')">
-                <span class="symptom-icon">📍</span>
-                <span>Stomach Pain</span>
-            </div>
-            <div class="symptom-btn" onclick="selectSymptom('rash')">
-                <span class="symptom-icon">🔴</span>
-                <span>Rash</span>
-            </div>
-            <div class="symptom-btn" onclick="selectSymptom('runny nose')">
-                <span class="symptom-icon">🤧</span>
-                <span>Runny Nose</span>
-            </div>
+            <div class="symptom-pill" onclick="selectSymptom(this, \'fever\')"><span>🌡️</span><span>Fever</span></div>
+            <div class="symptom-pill" onclick="selectSymptom(this, \'cough\')"><span>😷</span><span>Cough</span></div>
+            <div class="symptom-pill" onclick="selectSymptom(this, \'headache\')"><span>🤕</span><span>Headache</span></div>
+            <div class="symptom-pill" onclick="selectSymptom(this, \'fatigue\')"><span>😴</span><span>Fatigue</span></div>
+            <div class="symptom-pill" onclick="selectSymptom(this, \'nausea\')"><span>🤢</span><span>Nausea</span></div>
+            <div class="symptom-pill" onclick="selectSymptom(this, \'chest pain\')"><span>💔</span><span>Chest Pain</span></div>
+            <div class="symptom-pill" onclick="selectSymptom(this, \'sore throat\')"><span>🦠</span><span>Sore Throat</span></div>
+            <div class="symptom-pill" onclick="selectSymptom(this, \'dizziness\')"><span>🌀</span><span>Dizziness</span></div>
+            <div class="symptom-pill" onclick="selectSymptom(this, \'shortness of breath\')"><span>😤</span><span>Breathing</span></div>
+            <div class="symptom-pill" onclick="selectSymptom(this, \'stomach pain\')"><span>📍</span><span>Stomach Pain</span></div>
+            <div class="symptom-pill" onclick="selectSymptom(this, \'rash\')"><span>🔴</span><span>Rash</span></div>
+            <div class="symptom-pill" onclick="selectSymptom(this, \'runny nose\')"><span>🤧</span><span>Runny Nose</span></div>
         </div>
     </div>
     <script>
-    function selectSymptom(symptom) {
-        // Remove selected class from all buttons
-        document.querySelectorAll('.symptom-btn').forEach(btn => btn.classList.remove('selected'));
-        // Add selected class to clicked button
-        event.currentTarget.classList.add('selected');
-        // Find and update the dropdown
-        const dropdown = document.querySelector('select');
-        if (dropdown) {
-            for (let option of dropdown.options) {
-                if (option.text.toLowerCase() === symptom.toLowerCase()) {
-                    dropdown.value = option.value;
-                    dropdown.dispatchEvent(new Event('change'));
-                    break;
-                }
-            }
-        }
+    function selectSymptom(el, val) {
+        document.querySelectorAll('.symptom-pill').forEach(b => b.classList.remove('active'));
+        el.classList.add('active');
+        const sel = document.querySelector('select');
+        if(sel) { sel.value = val; sel.dispatchEvent(new Event('change')); }
     }
     </script>
+    ''')
+    
+    symptom_input = gr.Dropdown(choices=symptoms_list, value="fever", label="Selected Symptom", visible=True)
+    
+    gr.HTML('''
+    <div class="card">
+        <h3 style="margin: 0 0 12px; color: #1F2937;">How Severe Is It?</h3>
+        <div class="severity-btns">
+            <div class="sev-btn mild" onclick="setSeverity(\'Mild\', this)"><span>🙂</span><strong>Mild</strong><small>Manageable</small></div>
+            <div class="sev-btn moderate selected" onclick="setSeverity(\'Moderate\', this)"><span>😐</span><strong>Moderate</strong><small>Daily affected</small></div>
+            <div class="sev-btn severe" onclick="setSeverity(\'Severe\', this)"><span>😣</span><strong>Severe</strong><small>Hard to ignore</small></div>
+        </div>
+    </div>
+    <script>
+    function setSeverity(val, el) {
+        document.querySelectorAll('.sev-btn').forEach(b => b.classList.remove('selected'));
+        el.classList.add('selected');
+    }
+    </script>
+    ''')
+    
+    severity_input = gr.Radio(choices=["Mild", "Moderate", "Severe"], value="Moderate", label="Severity", visible=False)
+    
+    gr.HTML('<div class="card">')
+    duration_input = gr.Slider(1, 30, value=3, step=1, label="Duration (days)")
+    additional_info = gr.Textbox(label="Additional Details (optional)", placeholder="Any extra symptoms or information...", lines=2)
+    gr.HTML('</div>')
+    
+    analyze_btn = gr.Button("🔍 Analyze Symptoms", elem_classes="analyze-btn")
+    
+    output_area = gr.HTML()
+    
+    gr.HTML("""
+    <div style="background: #FEF3C7; border: 1px solid #FCD34D; border-radius: 12px; padding: 16px; margin-top: 16px; text-align: center; font-size: 13px;">
+        <strong>⚠️ Medical Disclaimer:</strong> This AI provides general health info only. Not a substitute for professional medical advice.
+    </div>
     """)
     
-    # Main input form
-    with gr.Column():
-        # Dropdown for symptom selection (hidden but functional)
-        symptom_input = gr.Dropdown(
-            choices=symptoms_list,
-            value="fever",
-            label="Selected Symptom",
-            visible=True
-        )
-        
-        # Visual severity selector with visual buttons
-        gr.HTML("""
-        <div class="severity-selector">
-            <div class="section-title">How Severe Is It?</div>
-            <div class="severity-options">
-                <div class="severity-btn mild" onclick="selectSeverity('Mild', this)">
-                    <span class="severity-icon">🙂</span>
-                    <span class="severity-label">Mild</span>
-                    <span class="severity-desc">Annoying but manageable</span>
-                </div>
-                <div class="severity-btn moderate selected" onclick="selectSeverity('Moderate', this)">
-                    <span class="severity-icon">😐</span>
-                    <span class="severity-label">Moderate</span>
-                    <span class="severity-desc">Affecting daily activities</span>
-                </div>
-                <div class="severity-btn severe" onclick="selectSeverity('Severe', this)">
-                    <span class="severity-icon">😣</span>
-                    <span class="severity-label">Severe</span>
-                    <span class="severity-desc">Hard to ignore</span>
-                </div>
-            </div>
-        </div>
-        <script>
-        function selectSeverity(value, el) {
-            document.querySelectorAll('.severity-btn').forEach(btn => btn.classList.remove('selected'));
-            el.classList.add('selected');
-        }
-        </script>
-        """)
-        
-        # Hidden severity radio (used for actual processing)
-        severity_input = gr.Radio(
-            ["Mild", "Moderate", "Severe"],
-            value="Moderate",
-            label="Severity",
-            visible=False
-        )
-        
-        # Duration slider
-        duration_input = gr.Slider(1, 30, value=3, step=1, label="Duration (days)")
-        
-        # Additional information textbox
-        additional_info = gr.Textbox(
-            label="Additional Details (optional)",
-            placeholder="Any extra symptoms or information...",
-            lines=2
-        )
-        
-        # Analyze button
-        analyze_btn = gr.Button("🔍 Analyze Symptoms", elem_classes="analyze-btn")
-        
-        # Results output area
-        output_area = gr.HTML()
-        
-        # Medical disclaimer
-        gr.HTML("""
-        <div class="disclaimer-section">
-            <strong>⚠️ Medical Disclaimer:</strong> This AI tool provides general health information only and is NOT a substitute for professional medical advice. Always seek the advice of your physician. If experiencing a medical emergency, call emergency services immediately.
-        </div>
-        """)
-        
-        # Privacy notice
-        gr.HTML("""
-        <div class="privacy-section">
-            🔒 Your privacy is protected - no data is stored permanently
-        </div>
-        """)
-        
-        # Footer
-        gr.HTML("""
-        <div class="app-footer">
-            AI Symptom Checker | For Educational Purposes Only | Not a Medical Device
-        </div>
-        """)
-    
-    # Set up event handler for analyze button
-    analyze_btn.click(
-        fn=analyze_symptoms,
-        inputs=[symptom_input, severity_input, duration_input, additional_info],
-        outputs=output_area
-    )
-
-
-# ============================================
-# MAIN ENTRY POINT
-# ============================================
+    analyze_btn.click(fn=analyze, inputs=[symptom_input, severity_input, duration_input, additional_info], outputs=output_area)
 
 if __name__ == "__main__":
-    # Launch the Gradio app
-    # css parameter moved to launch() in Gradio 6.0
-    demo.launch(css=CUSTOM_CSS)
+    demo.launch()
