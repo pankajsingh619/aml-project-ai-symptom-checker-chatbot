@@ -1,9 +1,31 @@
+"""
+AI Symptom Checker Chatbot
+=====================
+A professional healthcare AI application that helps users understand their symptoms
+and provides health guidance with follow-up questions.
+
+Features:
+- Emergency keyword detection
+- Visual symptom selector with icons
+- Severity assessment (Mild/Moderate/Severe)
+- Possible causes with likelihood percentages
+- Recommended actions
+- Warning signs to watch for
+- Follow-up question analysis
+- Professional healthcare UI
+
+Author: AI Symptom Checker Team
+License: Educational Use Only
+"""
+
 import gradio as gr
 from symptom_checker_backend import SymptomCheckerBackend
 import uuid
 
+# Initialize the backend with symptom mappings and advice
 backend = SymptomCheckerBackend()
 
+# Emergency keywords that require immediate attention
 EMERGENCY_KEYWORDS = [
     "chest pain", "difficulty breathing", "can't breathe", "cannot breathe",
     "severe bleeding", "unconscious", "stroke", "heart attack",
@@ -11,6 +33,7 @@ EMERGENCY_KEYWORDS = [
     "severe head injury", "loss of vision", "anaphylaxis"
 ]
 
+# Emoji icons for each symptom for visual representation
 SYMPTOM_ICONS = {
     "fever": "🌡️", "cough": "😷", "headache": "🤕", "fatigue": "😴",
     "nausea": "🤢", "chest pain": "💔", "sore throat": "🦠",
@@ -18,14 +41,34 @@ SYMPTOM_ICONS = {
     "rash": "🔴", "runny nose": "🤧"
 }
 
+
 def check_emergency(symptom):
+    """
+    Check if any emergency keywords are present in the symptom description.
+    
+    Args:
+        symptom: The symptom text to check
+        
+    Returns:
+        Tuple of (is_emergency: bool, keyword: str or None)
+    """
     symptom_lower = symptom.lower()
     for keyword in EMERGENCY_KEYWORDS:
         if keyword in symptom_lower:
             return True, keyword
     return False, None
 
+
 def get_emergency_response(keyword):
+    """
+    Generate an emergency response when critical symptoms are detected.
+    
+    Args:
+        keyword: The emergency keyword detected
+        
+    Returns:
+        HTML formatted emergency message
+    """
     return f"""
 <div class="emergency-banner">
     <div class="emergency-icon">🚨</div>
@@ -43,20 +86,37 @@ def get_emergency_response(keyword):
 </div>
 """
 
+
 def analyze_symptoms(symptom, severity, duration, details):
+    """
+    Main analysis function that processes user input and generates health assessment.
+    
+    Args:
+        symptom: Selected symptom from the dropdown
+        severity: Selected severity level (Mild/Moderate/Severe)
+        duration: Number of days symptoms have persisted
+        details: Additional information provided by user
+        
+    Returns:
+        HTML formatted response with assessment results
+    """
+    # Step 1: Check for emergency keywords first
     is_emergency, keyword = check_emergency(symptom)
     if is_emergency:
         return get_emergency_response(keyword)
     
+    # Step 2: Get base advice and follow-up question from backend
     advice = backend.symptomAdviceMap.get(symptom, "Please consult a healthcare professional.")
     follow_up = backend.followUpQuestions.get(symptom, "")
     
+    # Step 3: Process any follow-up information provided
     follow_up_resp = None
     additional = None
     if details:
         follow_up_resp = backend.generate_response(symptom, details)
         additional = backend.follow_up_advice(symptom, details)
     
+    # Step 4: Determine severity level for banner color
     severity_lower = severity.lower()
     if severity_lower == "mild":
         banner_class = "low"
@@ -68,10 +128,11 @@ def analyze_symptoms(symptom, severity, duration, details):
         banner_class = "medium"
         banner_text = "MODERATE CONCERN"
     
+    # Step 5: Get icon and possible causes
     icon = SYMPTOM_ICONS.get(symptom, "🏥")
-    
     causes = get_possible_causes(symptom)
     
+    # Step 6: Build the HTML response
     result = f"""
 <div class="results-container">
     <div class="severity-banner {banner_class}">
@@ -123,6 +184,7 @@ def analyze_symptoms(symptom, severity, duration, details):
     </div>
 """
     
+    # Step 7: Add follow-up section if user provided additional info
     if follow_up_resp:
         result += f"""
     <div class="follow-up-section">
@@ -138,6 +200,7 @@ def analyze_symptoms(symptom, severity, duration, details):
     </div>
 """
     
+    # Step 8: Add next steps buttons
     result += """
     <div class="next-steps">
         <h4>What would you like to do next?</h4>
@@ -150,7 +213,18 @@ def analyze_symptoms(symptom, severity, duration, details):
 """
     return result
 
+
 def get_possible_causes(symptom):
+    """
+    Get possible causes for a given symptom with likelihood percentages.
+    
+    Args:
+        symptom: The symptom to look up causes for
+        
+    Returns:
+        HTML formatted list of possible causes
+    """
+    # Mapping of symptoms to possible causes with percentages and descriptions
     causes_map = {
         "fever": [("65%", "Viral Infection", "Common cold or flu"), ("30%", "Bacterial Infection", "May need antibiotics"), ("15%", "Other Causes", "Heat exhaustion, immune response")],
         "cough": [("50%", "Common Cold", "Viral respiratory infection"), ("25%", "Allergies", "Seasonal or environmental"), ("15%", "GERD", "Acid reflux irritation"), ("10%", "Asthma", "Airway inflammation")],
@@ -181,10 +255,22 @@ def get_possible_causes(symptom):
         '''
     return html
 
+
+# Get list of available symptoms from backend
 symptoms_list = list(backend.symptomKeywordsMap.keys())
 
+
+# ============================================
+# PROFESSIONAL HEALTHCARE CSS STYLING
+# ============================================
+
 CUSTOM_CSS = """
+/* ============================================
+   AI SYMPTOM CHECKER - PROFESSIONAL STYLING
+   ============================================ */
+
 :root {
+    /* Healthcare Color Palette - Clinical Trust */
     --primary: #0066CC;
     --primary-light: #3388DD;
     --primary-dark: #004C99;
@@ -213,6 +299,7 @@ CUSTOM_CSS = """
     --radius-lg: 16px;
 }
 
+/* Reset & Base Styles */
 .gradio-container {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
     background: var(--bg-main) !important;
@@ -221,11 +308,15 @@ CUSTOM_CSS = """
     padding: 20px !important;
 }
 
+/* Hide Gradio branding */
 .gradio-container footer,
 .gradio-container .built-with,
 .gradio-container .api-link { display: none !important; }
 
-/* HEADER */
+/* ============================================
+   HEADER STYLING
+   ============================================ */
+
 .app-header {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: white;
@@ -275,7 +366,10 @@ CUSTOM_CSS = """
     backdrop-filter: blur(10px);
 }
 
-/* INPUT SECTION */
+/* ============================================
+   INPUT SECTION
+   ============================================ */
+
 .input-section {
     background: var(--bg-surface);
     border-radius: var(--radius-lg);
@@ -291,7 +385,7 @@ CUSTOM_CSS = """
     margin-bottom: 12px;
 }
 
-/* SYMPTOM GRID */
+/* Visual Symptom Grid */
 .symptom-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -330,7 +424,10 @@ CUSTOM_CSS = """
 
 .symptom-icon { font-size: 24px; }
 
-/* SEVERITY SELECTOR */
+/* ============================================
+   SEVERITY SELECTOR
+   ============================================ */
+
 .severity-selector { margin: 20px 0; }
 
 .severity-options {
@@ -369,7 +466,7 @@ CUSTOM_CSS = """
 .severity-label { font-weight: 600; color: var(--text-primary); font-size: 14px; }
 .severity-desc { font-size: 11px; color: var(--text-muted); line-height: 1.3; }
 
-/* INPUT FIELDS */
+/* Input Field Styling */
 .gr-text-input input,
 .gr-text-input textarea {
     border: 2px solid var(--border) !important;
@@ -393,7 +490,10 @@ CUSTOM_CSS = """
     margin-bottom: 8px !important;
 }
 
-/* ANALYZE BUTTON */
+/* ============================================
+   ANALYZE BUTTON
+   ============================================ */
+
 .analyze-btn {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%) !important;
     border: none !important;
@@ -414,7 +514,10 @@ CUSTOM_CSS = """
     box-shadow: 0 6px 20px rgba(0, 102, 204, 0.4) !important;
 }
 
-/* RESULTS */
+/* ============================================
+   RESULTS SECTION
+   ============================================ */
+
 .results-container {
     background: var(--bg-surface);
     border-radius: var(--radius-lg);
@@ -485,7 +588,10 @@ CUSTOM_CSS = """
 .action-list li::before { content: "✓"; position: absolute; left: 0; color: var(--success); font-weight: bold; }
 .warning-list li::before { content: "!"; position: absolute; left: 0; color: var(--error); font-weight: bold; }
 
-/* EMERGENCY */
+/* ============================================
+   EMERGENCY BANNER
+   ============================================ */
+
 .emergency-banner {
     background: linear-gradient(135deg, var(--error) 0%, #B71C1C 100%);
     color: white; padding: 24px;
@@ -499,7 +605,7 @@ CUSTOM_CSS = """
 .action-item { font-size: 24px; }
 .emergency-warning { background: rgba(255,255,255,0.2); padding: 12px; border-radius: 8px; font-size: 12px; }
 
-/* FOLLOW-UP */
+/* Follow-up Section */
 .follow-up-section {
     background: rgba(0, 102, 204, 0.05);
     padding: 16px 20px;
@@ -508,7 +614,7 @@ CUSTOM_CSS = """
 
 .follow-up-content p { margin: 8px 0; font-size: 13px; }
 
-/* NEXT STEPS */
+/* Next Steps */
 .next-steps {
     padding: 20px;
     border-top: 1px solid var(--border-light);
@@ -526,7 +632,10 @@ CUSTOM_CSS = """
 }
 .action-btn:hover { border-color: var(--primary); color: var(--primary); }
 
-/* DISCLAIMER */
+/* ============================================
+   DISCLAIMER & PRIVACY
+   ============================================ */
+
 .disclaimer-section {
     background: var(--warning-bg);
     border: 1px solid rgba(245, 166, 35, 0.3);
@@ -547,7 +656,7 @@ CUSTOM_CSS = """
     display: flex; align-items: center; gap: 8px;
 }
 
-/* FOOTER */
+/* Footer */
 .app-footer {
     text-align: center; padding: 20px;
     color: var(--text-muted); font-size: 11px;
@@ -555,10 +664,13 @@ CUSTOM_CSS = """
     margin-top: 24px;
 }
 
-/* EXAMPLES */
+/* Hide Examples */
 .gr-examples { display: none !important; }
 
-/* MOBILE */
+/* ============================================
+   MOBILE RESPONSIVE
+   ============================================ */
+
 @media (max-width: 640px) {
     .gradio-container { padding: 12px !important; }
     .app-header { padding: 20px !important; border-radius: var(--radius-md) !important; }
@@ -574,10 +686,17 @@ CUSTOM_CSS = """
 }
 """
 
+
+# ============================================
+# GRADIO INTERFACE BUILDER
+# ============================================
+
 with gr.Blocks(title="AI Symptom Checker") as demo:
     
+    # Generate unique session ID for tracking
     session_id = gr.State(value=str(uuid.uuid4())[:8])
     
+    # Header with logo and trust badges
     gr.HTML("""
     <div class="app-header">
         <div class="header-top">
@@ -595,6 +714,7 @@ with gr.Blocks(title="AI Symptom Checker") as demo:
     </div>
     """)
     
+    # Input section with symptom grid and severity selector
     gr.HTML("""
     <div class="input-section">
         <div class="section-title">Select Your Symptom:</div>
@@ -651,7 +771,9 @@ with gr.Blocks(title="AI Symptom Checker") as demo:
     </div>
     <script>
     function selectSymptom(symptom) {
+        // Remove selected class from all buttons
         document.querySelectorAll('.symptom-btn').forEach(btn => btn.classList.remove('selected'));
+        // Add selected class to clicked button
         event.currentTarget.classList.add('selected');
         // Find and update the dropdown
         const dropdown = document.querySelector('select');
@@ -668,7 +790,9 @@ with gr.Blocks(title="AI Symptom Checker") as demo:
     </script>
     """)
     
+    # Main input form
     with gr.Column():
+        # Dropdown for symptom selection (hidden but functional)
         symptom_input = gr.Dropdown(
             choices=symptoms_list,
             value="fever",
@@ -676,6 +800,7 @@ with gr.Blocks(title="AI Symptom Checker") as demo:
             visible=True
         )
         
+        # Visual severity selector with visual buttons
         gr.HTML("""
         <div class="severity-selector">
             <div class="section-title">How Severe Is It?</div>
@@ -705,6 +830,7 @@ with gr.Blocks(title="AI Symptom Checker") as demo:
         </script>
         """)
         
+        # Hidden severity radio (used for actual processing)
         severity_input = gr.Radio(
             ["Mild", "Moderate", "Severe"],
             value="Moderate",
@@ -712,41 +838,56 @@ with gr.Blocks(title="AI Symptom Checker") as demo:
             visible=False
         )
         
+        # Duration slider
         duration_input = gr.Slider(1, 30, value=3, step=1, label="Duration (days)")
         
+        # Additional information textbox
         additional_info = gr.Textbox(
             label="Additional Details (optional)",
             placeholder="Any extra symptoms or information...",
             lines=2
         )
         
+        # Analyze button
         analyze_btn = gr.Button("🔍 Analyze Symptoms", elem_classes="analyze-btn")
         
+        # Results output area
         output_area = gr.HTML()
         
+        # Medical disclaimer
         gr.HTML("""
         <div class="disclaimer-section">
             <strong>⚠️ Medical Disclaimer:</strong> This AI tool provides general health information only and is NOT a substitute for professional medical advice. Always seek the advice of your physician. If experiencing a medical emergency, call emergency services immediately.
         </div>
         """)
         
+        # Privacy notice
         gr.HTML("""
         <div class="privacy-section">
             🔒 Your privacy is protected - no data is stored permanently
         </div>
         """)
         
+        # Footer
         gr.HTML("""
         <div class="app-footer">
             AI Symptom Checker | For Educational Purposes Only | Not a Medical Device
         </div>
         """)
     
+    # Set up event handler for analyze button
     analyze_btn.click(
         fn=analyze_symptoms,
         inputs=[symptom_input, severity_input, duration_input, additional_info],
         outputs=output_area
     )
 
+
+# ============================================
+# MAIN ENTRY POINT
+# ============================================
+
 if __name__ == "__main__":
+    # Launch the Gradio app
+    # css parameter moved to launch() in Gradio 6.0
     demo.launch(css=CUSTOM_CSS)
